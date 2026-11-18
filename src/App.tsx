@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { auth, api } from '@appdeploy/client';
+import { auth, api } from './supabaseClient';
 import { Html5Qrcode } from 'html5-qrcode';
 import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
@@ -148,6 +148,9 @@ function StatusPill({ status }: { status: string }) {
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [boot, setBoot] = useState<Bootstrap | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -342,12 +345,29 @@ export default function App() {
     setNotice(message);
     window.setTimeout(() => setNotice(''), 3500);
   };
-  const signIn = async () => {
+  const signIn = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     setError('');
+    setBusy(true);
     try {
-      await auth.signInWithRedirect();
+      const current =
+        authMode === 'signup'
+          ? await auth.signUp(authEmail, authPassword)
+          : await auth.signInWithPassword(authEmail, authPassword);
+      setUser(current);
+      try {
+        await loadData();
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.error ||
+            err?.message ||
+            'Unable to load your account. Ask the IT Unit administrator to register your email.'
+        );
+      }
     } catch (err: any) {
-      setError(err?.message || 'Sign-in could not start. Please retry.');
+      setError(err?.message || 'Sign-in failed. Please retry.');
+    } finally {
+      setBusy(false);
     }
   };
   const signOut = async () => {
@@ -557,8 +577,8 @@ export default function App() {
             <span className="eyebrow">WELCOME</span>
             <h2>Sign in to continue</h2>
             <p>
-              Use your registered Google or email sign-in account to access the
-              attendance system.
+              Use the email address registered by the IT Unit administrator
+              to access the attendance system.
             </p>
             {error && (
               <div className="alert error">
@@ -566,8 +586,52 @@ export default function App() {
                 {error}
               </div>
             )}
-            <button className="primary-btn full" onClick={signIn}>
-              Continue to secure sign in <ArrowDownToLine size={17} />
+            <form onSubmit={signIn} className="form-grid login-form">
+              <label>
+                Email address
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  autoComplete={
+                    authMode === 'signup' ? 'new-password' : 'current-password'
+                  }
+                  minLength={6}
+                  required
+                />
+              </label>
+              <button className="primary-btn full" type="submit" disabled={busy}>
+                {busy
+                  ? 'Please wait…'
+                  : authMode === 'signup'
+                    ? 'Create my account'
+                    : 'Sign in'}{' '}
+                <ArrowDownToLine size={17} />
+              </button>
+            </form>
+            <button
+              type="button"
+              className="text-btn"
+              onClick={() => {
+                setError('');
+                setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
+              }}
+            >
+              {authMode === 'signin'
+                ? 'First time? Create your account'
+                : 'Already have an account? Sign in'}
             </button>
             <div className="login-note">
               <ShieldCheck size={16} />

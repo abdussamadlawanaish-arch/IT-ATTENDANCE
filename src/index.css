@@ -1702,3 +1702,10 @@ tbody tr:last-child td {
     margin-top: 20px;
   }
 }
+
+.login-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin: 18px 0 8px;
+}
